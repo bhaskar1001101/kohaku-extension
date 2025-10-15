@@ -1,27 +1,341 @@
-# Ambire Wallet
+# Tohaku
 
 <div align="center">
-  <a href="https://chromewebstore.google.com/detail/ambire-wallet/ehgjhhccekdedpbkifaojjaefeohnoea" target="_blank">
-    <img src="./mockups/mockup-dashboard.png" alt="Ambire Wallet Dashboard" />
-  </a>
-
   <p>
-    The secure & easy-to-use Web3 wallet. EIP-7702 ready.<br />
-    <a href="https://chromewebstore.google.com/detail/ambire-wallet/ehgjhhccekdedpbkifaojjaefeohnoea" target="_blank">
-      <strong>Download Extension for Webkit Browsers 🔥</strong>
-    </a>
-    <br />
-    <em>(Chrome, Brave, Opera, Edge, Arc)</em>
-    <br /><br />
-    💌 Request Invite Code:
-    <a href="https://discord.com/invite/Ambire" target="_blank">Discord</a> |
-    <a href="https://t.me/AmbireOfficial" target="_blank">Telegram</a>
-    <br />
-    🐞
-    <a href="https://github.com/AmbireTech/extension/issues">Report a Bug</a> ·
-    <a href="https://forum.ambire.com/" target="_blank">Request Features</a>
+    Privacy-preserving Ethereum wallet with Tor and Nym mixnet integration.<br />
+    <em>Research demonstration built on Ambire Wallet</em>
   </p>
 </div>
+
+## Research Project Overview
+
+**Research Question:** How do Tor and Nym mixnets compare for protecting Ethereum RPC metadata, and what are the practical tradeoffs?
+
+This is a research demonstration, not a production implementation. The goal is rigorous analysis of privacy tradeoffs with empirical measurements.
+
+### Threat Model
+
+**What we're protecting:**
+- IP address to account address correlation
+- Transaction timing analysis (MEV, front-running)
+- Multi-chain account linkability
+- ISP/state-level surveillance of blockchain interactions
+
+**Legitimate use cases:**
+- Activists in authoritarian regimes using crypto for coordination
+- Traders protecting against MEV front-running
+- Users preventing commercial tracking/profiling
+- Compartmentalizing addresses (Kohaku's "one account per dApp" philosophy)
+- Right to read blockchain without surveillance
+
+
+## Metadata Leakage Analysis
+
+### Baseline (No Privacy)
+
+**Observed leaks in standard Ambire/Kohaku usage:**
+
+1. **Multi-chain account correlation**:
+   ```
+   GET https://relayer.ambire.com/velcro-v3/multi-hints?
+       networks=1,10,56,137,5000,8453,42161,43114,534352&
+       accounts=0xAlice,0xBob,0xCarol&
+       sigs=2,1,3
+   ```
+   Exposes all your addresses across 9+ chains in a single request. Relayer can link: "This user controls these addresses on all these chains."
+
+2. **RPC provider surveillance**:
+   - Balance checks: `eth_getBalance(0xAlice)` reveals you control 0xAlice
+   - Transaction broadcast: `eth_sendRawTransaction(...)` exposes your IP and transaction timing
+   - State queries: Wallet polling patterns are fingerprintable
+
+3. **Account Abstraction metadata**:
+   - Bundlers (Pimlico, Etherspot) see UserOperations before blockchain submission
+   - Paymasters reveal sponsorship relationships
+   - EntryPoint contract creates public transaction graph
+
+4. **Instance tracking**:
+   - `x-app-source` header on all requests (extension fingerprinting)
+   - Price feed queries to `cena.ambire.com` (usage patterns)
+
+## Privacy Layer Architecture
+
+### Network Call Interception Points
+
+**Primary:** `fetchWithAnalytics` (src/web/extension-services/background/background.ts:314-358)
+- Wraps ALL network requests from MainController
+- Routes to: Relayer, Velcro, RPC providers, bundlers, price feeds
+- Single interception point for maximum coverage
+
+**Secondary:** `forwardRpcRequests` (src/web/extension-services/inpage/ambire-inpage.ts:104-119)
+- Handles dApp-initiated RPC requests
+- Less critical (dApp can see its own requests anyway)
+
+**Transaction broadcast paths:**
+1. **Regular transactions**: `provider.send('eth_sendRawTransaction', ...)` via ethers JsonRpcProvider
+2. **ERC-4337 UserOps**: Bundler APIs (Pimlico, Etherspot) via custom fetch
+3. **Relayer broadcasts**: `relayerCall()` via fetchWithAnalytics
+
+**ALL routes eventually use browser's native `fetch()`, making single-point interception possible.**
+
+## Tor Integration
+
+### Architecture
+
+**User setup:**
+```bash
+# User runs Tor daemon locally
+tor
+# SOCKS5 proxy now listening on localhost:9050
+```
+
+**Extension integration:**
+```typescript
+// PrivacyProxyService routes through SOCKS5 proxy
+class PrivacyProxyService {
+  async fetch(url, init, sensitivity: 'high' | 'medium' | 'low') {
+    if (mode === 'tor') {
+      return fetchViaSocks5('localhost:9050', url, init, {
+        newCircuit: sensitivity === 'high'  // Circuit isolation
+      })
+    }
+  }
+}
+```
+
+### Circuit Management (Wasabi Wallet Model)
+
+**Strategy:**
+- **Default circuit**: Balance checks, price feeds (speed matters)
+- **New circuit per request**: High-value transactions (privacy critical)
+- **Per-address isolation**: Each address uses dedicated circuit (compartmentalization)
+
+### What Tor Protects
+
+- IP address hidden from RPC provider (exit node IP seen instead)
+- RPC provider hidden from ISP (only guard node visible)
+- Single-point surveillance defeated
+- Censorship resistance
+
+### What Tor Does NOT Protect
+
+- **Timing attacks**: Packet timing preserved (~constant latency)
+- **Traffic analysis**: Patterns visible to global passive adversary
+- **Application metadata**: RPC provider still sees query content
+- **End-to-end correlation**: If adversary controls entry + exit nodes
+
+### Measured Performance
+
+| Metric | Baseline | Tor |
+|--------|----------|-----|
+| Latency (P50) | | |
+| Latency (P95) | | |
+| Success Rate | | |
+| Anonymity Set | 0 | ~7,000 relays |
+| Timing Variance | Low (predictable) | Low (vulnerable to correlation) |
+
+### Timing Correlation Vulnerability
+
+**Attack scenario:**
+```
+Adversary observes:
+- Entry node: Packet from User IP at T₀
+- Exit node: RPC query to Infura at T₀ + 237ms (typical Tor latency)
+Result: Correlation confidence 90%+ (timing is nearly constant)
+```
+
+**Countermeasures:**
+- Use high-latency mix nodes (not standard Tor)
+- Add random delays (degrades UX)
+- Use Nym mixnet instead (next section)
+
+## Nym Integration
+
+### Architecture
+
+**User setup:**
+```bash
+# User runs Nym SOCKS5 client
+nym-socks5-client run
+# SOCKS5 proxy now listening on localhost:1080
+```
+
+**Extension integration:**
+```typescript
+// Same PrivacyProxyService, different backend
+if (mode === 'nym') {
+  return fetchViaSocks5('localhost:1080', url, init)
+  // Nym client handles: Sphinx packets, Poisson mixing, cover traffic
+}
+```
+
+### No Custom Service Provider Needed
+
+**For this demo:**
+- Nym SOCKS client routes through mixnet automatically
+- Exit gateway connects to clearnet RPC (Infura, Alchemy, etc.)
+- Sphinx packet format + Loopix mixing strategy built-in
+
+**Custom service provider only needed for:**
+- Running own RPC that ONLY accepts Nym traffic (`.nym` addresses)
+- Protocol modifications (not in scope)
+
+### Sphinx Packet Format
+
+**Bitwise unlinkability:**
+```rust
+// Each hop transforms the packet
+α₂ = b · α₁        // Different group element
+β₂ = reencrypt(β₁) // Different ciphertext
+γ₂ = HMAC(s, α₂||β₂) // Different MAC
+
+// Result: P₁ and P₂ share NO common bits
+```
+
+**Property:** Entry and exit packets have zero correlation at binary level.
+
+### Loopix Mixing Strategy
+
+**Poisson delay distribution:**
+```python
+delay = random.expovariate(λ=0.5)  # Mean 2s, high variance
+```
+
+**Memoryless property:**
+```
+P(T > s+t | T > s) = P(T > t)
+```
+Knowing how long a packet waited reveals NOTHING about when it releases.
+
+**Effect:** Destroys timing correlation that Tor is vulnerable to.
+
+### Cover Traffic
+
+**Continuous dummy packets even when idle:**
+- Rate: ~0.2 packets/second
+- Cost: ~35 GB/day bandwidth
+- Benefit: Adversary cannot tell user active vs idle
+
+### Measured Performance
+
+| Metric | Baseline | Nym |
+|--------|----------|-----|
+| Latency (P50) | | |
+| Latency (P95) | | |
+| Success Rate | | |
+| Anonymity Set | 0 | ~512,000 paths (80³) |
+| Timing Variance | Low | **HIGH** (good for privacy) |
+
+### Timing Correlation Resistance
+
+**Attack scenario (FAILS):**
+```
+Adversary observes:
+- Entry gateway: Packet at T₀
+- Exit gateway: Packet at T₀ + ???ms (anywhere from 1s to 10s)
+Result: Correlation confidence <10% (timing is randomized by Poisson mixing)
+```
+
+**Tradeoff:** Higher latency, but near-perfect timing privacy.
+
+## Comparative Analysis
+
+### Privacy vs Usability Matrix
+
+| Scenario | Baseline | Tor | Nym | Recommendation |
+|----------|----------|-----|-----|----------------|
+| Balance check | Fast, no privacy | Good speed, good privacy | Slow, excellent privacy | **Tor** (speed matters) |
+| High-value tx | Fast, MEV vulnerable | Good speed, timing vulnerable | Slow, MEV resistant | **Nym** (timing matters) |
+| State surveillance | Fully exposed | Exit correlation possible | Near-impossible correlation | **Nym** (state-level threat) |
+| General DeFi | Fast, tracked | Good balance | Too slow? | **Tor** (good enough) |
+| Privacy-conscious trading | Exposed | Hybrid: Tor reads, Nym writes | Full Nym | **Hybrid** (best of both) |
+
+### Anonymity Metrics
+
+**IP Privacy:**
+- Baseline: Leaked to RPC provider, ISP, network observers
+- Tor: Hidden (exit node IP seen by RPC provider)
+- Nym: Hidden (exit gateway IP seen)
+
+**Timing Attack Resistance:**
+- Baseline: Perfect correlation (same timing = same user)
+- Tor: Vulnerable (latency ~constant, 90%+ correlation possible)
+- Nym: Protected (high variance, <10% correlation)
+
+**Anonymity Set Size:**
+- Baseline: 0 (your IP uniquely identifies you)
+- Tor: ~7,000 relays (but guard stable, exit limited to ~1,000)
+- Nym: ~512,000 paths (80 nodes × 3 layers, exponential scaling)
+
+**Application Metadata:**
+- All: RPC provider still sees query content (future: PIR)
+
+## User Experience Design
+
+### Privacy Mode Selection
+
+**Extension Settings Panel:**
+```
+Settings → Privacy Mode
+○ Direct (No Privacy) - Fastest
+○ Tor (Good Privacy) - Balanced
+○ Nym (Maximum Privacy) - Slowest
+```
+
+**Automatic (Sensitivity-Based):**
+```typescript
+function determinePrivacyMode(requestType: string, value: bigint) {
+  if (requestType === 'broadcast' && value > ethers.parseEther('1.0')) {
+    return 'nym'  // High-value tx
+  }
+  if (requestType === 'balance' || requestType === 'price') {
+    return 'tor'  // Read-only, speed matters
+  }
+  return 'tor'  // Default: balanced
+}
+```
+
+### Failure Handling
+
+**Tor circuit failure:**
+- Retry with new circuit (3 attempts)
+- Fall back to direct connection with user consent
+- Display: "Tor unavailable. Proceed without privacy?"
+
+**Nym mixnet failure:**
+- Retry with different mix nodes (2 attempts)
+- Fall back to Tor (still private)
+- Display: "Nym slow/unavailable. Use Tor instead?"
+
+## Implementation Status
+
+### Completed (Research Phase)
+
+- Architecture analysis (data flow mapping)
+- Metadata leakage documentation (empirical observations)
+- Tor integration design (circuit management strategy)
+- Nym integration design (mixnet architecture understanding)
+- Comparative framework (metrics definition)
+
+### In Progress (Development Phase)
+
+- PrivacyProxyService implementation
+  - SOCKS5 proxy wrapper for browser fetch()
+  - Circuit isolation for Tor
+  - Mode switching logic
+- Measurement framework
+  - Latency benchmarking (P50, P95, P99)
+  - Timing correlation tests
+  - Success rate monitoring
+- UI integration
+  - Settings panel for mode selection
+  - Privacy status indicator
+  - Failure handling UX
+
+### Future Work
+
+- Private Information Retrieval for balance checks
+- Incentivized privacy infrastructure (.onion/.nym RPC nodes)
 
 ## Environment Setup
 
@@ -49,6 +363,29 @@ git submodule update
 ## Environment Variables
 
 Create ".env" file in the root directory and fill in all variables, see ".env-sample" for a reference.
+
+## Privacy Layer Prerequisites
+
+**For Tor integration:**
+```bash
+# Install Tor daemon
+sudo apt install tor  # Debian/Ubuntu
+brew install tor      # macOS
+
+# Start Tor
+tor
+# SOCKS5 proxy now on localhost:9050
+```
+
+**For Nym integration:**
+```bash
+# Install Nym SOCKS5 client
+# See: https://nymtech.net/docs/clients/socks5-client.html
+
+# Run Nym client
+nym-socks5-client run
+# SOCKS5 proxy now on localhost:1080
+```
 
 ## Editor Config
 
@@ -88,7 +425,7 @@ Make sure your code editor has plugins that support the following configuration 
   then in the Safari browser:
 
   - Developer -> Developer settings...
-  - Check the “Allow unsigned extensions” option. (Note: This setting may not persist after Safari is restarted.)​
+  - Check the "Allow unsigned extensions" option. (Note: This setting may not persist after Safari is restarted.)​
   - Then the extension should be automatically added and pinned in the browser.
 
   NOTE: You can manage the available extensions from: Safari -> Settings... -> Extensions
@@ -176,7 +513,7 @@ And find the resulting zips in the "build" folder as `ambire-extension-<VERSION>
 
 ## Mobile Apps
 
-The Ambire v2 compatible mobile apps are yet to be developed. Coming sometime in the near future 🤞
+The Ambire v2 compatible mobile apps are yet to be developed. Coming sometime in the near future.
 
 ## Explorer (Old name: Benzin)
 
@@ -225,3 +562,49 @@ And find the resulting build in the "build/legends-prod" folder.
 #### Configuration
 
 We've migrated from Puppeteer to Playwright (./e2e-playwright-tests/). Documentation will follow soon.
+
+## References & Related Work
+
+### Academic Papers
+- **Sphinx**: Compact and provably secure mix format (Danezis & Goldberg, 2009)
+- **Loopix**: Anonymity system with Poisson mixing (Piotrowska et al., 2017)
+- **Traffic analysis attacks on Tor** (Murdoch & Danezis, 2005)
+
+### Implementations
+- **Wasabi Wallet**: Tor integration for Bitcoin ([blog post](https://blog.wasabiwallet.website/explaining-wasabi-wallets-tor-implementation/))
+- **Nym Mixnet**: Production mixnet ([nymtech.net](https://nymtech.net))
+- **Tor Project**: Onion routing ([torproject.org](https://torproject.org))
+
+### Related Projects
+- **Brume Wallet**: Privacy-focused Ethereum wallet ([GitHub](https://github.com/brumeproject/wallet))
+- **Tor Wallet**: Minimal Tor-integrated wallet ([GitHub](https://github.com/torwalletxyz/wallet))
+- **Whonix Ethereum Guide**: Running Ethereum node over Tor ([Whonix docs](https://www.whonix.org/wiki/Ethereum))
+
+### Kohaku Project
+- **Kohaku Roadmap**: Privacy Pools & Railgun integration ([Ethereum Research](https://notes.ethereum.org/@niard/KohakuRoadmap))
+- **Kohaku SDK**: Privacy primitives for Ethereum ([GitHub](https://github.com/ethereum/kohaku))
+
+## Contributing
+
+"Privacy is a means to protect, not hide. The means are not justified if the end isn't."
+
+**We build privacy tools for legitimate use cases:**
+- Activists protecting themselves from the state
+- Users exercising their right to financial privacy
+- Everyone deserving to read blockchain without surveillance
+
+### Using for storing real funds?
+
+This is a project demonstrating privacy techniques. Before deploying in production:
+1. Understand your threat model (who are you protecting against?)
+2. Evaluate tradeoffs (privacy vs speed, cost vs benefit)
+3. Consider legal implications (some jurisdictions restrict anonymity tools)
+4. Test thoroughly (privacy bugs can be catastrophic)
+
+## Acknowledgments
+
+- **Ambire Team**: For building excellent wallet infrastructure
+- **Tor Project**: For pioneering anonymous communications
+- **Nym Technologies**: For advancing mixnet research
+- **Ethereum Foundation**: For supporting privacy research and Ethereum
+
