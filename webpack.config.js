@@ -94,7 +94,7 @@ module.exports = async function (env, argv) {
       manifest.externally_connectable = undefined
     }
 
-    const permissions = [...manifest.permissions, 'scripting', 'alarms']
+    const permissions = [...manifest.permissions, 'scripting', 'alarms', 'proxy']
     if (isWebkit && !isSafari) permissions.push('system.display')
     manifest.permissions = permissions
 

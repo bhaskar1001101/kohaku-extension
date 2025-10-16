@@ -313,7 +313,7 @@ export class EthereumProvider extends EventEmitter {
             const result = await Promise.race([
               this.#forwardRpcRequests(providerUrl, data.method, data.params),
               // Timeouts after 3 secs because sometimes the provider call hangs with no response
-              delayPromise(3000)
+              delayPromise(10000)
             ])
 
             if (data.method !== 'eth_call')
