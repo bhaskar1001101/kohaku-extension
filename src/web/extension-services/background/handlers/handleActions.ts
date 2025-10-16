@@ -669,6 +669,37 @@ export const handleActions = async (
       break
     }
 
+    case 'SET_PRIVACY_MODE': {
+      console.log('[Background] SET_PRIVACY_MODE:', params.mode)
+      const { privacyProxyService } = await import('@web/services/privacy/PrivacyProxyService')
+      const { torConnectionMonitor } = await import('@web/services/privacy/TorConnectionMonitor')
+      await privacyProxyService.setMode(params.mode)
+      console.log('[Background] Privacy mode set to:', params.mode)
+      if (params.mode === 'tor') {
+        torConnectionMonitor.startMonitoring()
+        console.log('[Background] Tor monitoring started')
+      } else {
+        torConnectionMonitor.stopMonitoring()
+        console.log('[Background] Tor monitoring stopped')
+      }
+      break
+    }
+    case 'GET_PRIVACY_STATUS': {
+      const { privacyProxyService } = await import('@web/services/privacy/PrivacyProxyService')
+      const status = {
+        mode: privacyProxyService.getMode(),
+        config: privacyProxyService.getConfig()
+      }
+      console.log('[Background] GET_PRIVACY_STATUS:', status)
+      return status
+    }
+    case 'GET_TOR_CONNECTION_STATUS': {
+      const { torConnectionMonitor } = await import('@web/services/privacy/TorConnectionMonitor')
+      const status = torConnectionMonitor.getStatus()
+      console.log('[Background] GET_TOR_CONNECTION_STATUS:', status)
+      return status
+    }
+
     default:
       // eslint-disable-next-line no-console
       return console.error(

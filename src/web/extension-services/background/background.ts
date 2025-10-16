@@ -76,6 +76,8 @@ import TrezorSigner from '@web/modules/hardware-wallet/libs/TrezorSigner'
 import { getExtensionInstanceId } from '@web/utils/analytics'
 import getOriginFromUrl from '@web/utils/getOriginFromUrl'
 import { LOG_LEVELS, logInfoWithPrefix } from '@web/utils/logger'
+import { privacyProxyService } from '@web/services/privacy/PrivacyProxyService'
+import { torConnectionMonitor } from '@web/services/privacy/TorConnectionMonitor'
 
 import {
   captureBackgroundException,
@@ -217,6 +219,15 @@ function getIntervalRefreshTime(constUpdateInterval: number, newestOpTimestamp: 
 
 // eslint-disable-next-line @typescript-eslint/no-floating-promises
 ;(async () => {
+  // Initialize privacy proxy service (Tor/Nym integration)
+  await privacyProxyService.init()
+  console.log('[PrivacyProxy] Service initialized, mode:', privacyProxyService.getMode())
+
+  // Start Tor connection monitoring if mode is 'tor'
+  if (privacyProxyService.getMode() === 'tor') {
+    torConnectionMonitor.startMonitoring()
+    console.log('[TorMonitor] Started monitoring')
+  }
   // Init sentry
   if (CONFIG.SENTRY_DSN_BROWSER_EXTENSION) {
     Sentry.init({
@@ -416,6 +427,9 @@ function getIntervalRefreshTime(constUpdateInterval: number, newestOpTimestamp: 
       await mainCtrl.dapps.broadcastDappSessionEvent('logLevelUpdate', nextLogLevel)
     }
   })
+
+
+
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const badgesCtrl = new BadgesController(mainCtrl, walletStateCtrl)
   const autoLockCtrl = new AutoLockController(() => {

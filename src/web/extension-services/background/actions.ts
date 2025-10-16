@@ -748,6 +748,17 @@ type DismissBanner = {
   }
 }
 
+type SetPrivacyModeAction = {
+  type: 'SET_PRIVACY_MODE'
+  params: { mode: 'direct' | 'tor' | 'nym' }
+}
+type GetPrivacyStatusAction = {
+  type: 'GET_PRIVACY_STATUS'
+}
+type GetTorConnectionStatusAction = {
+  type: 'GET_TOR_CONNECTION_STATUS'
+}
+
 export type Action =
   | UpdateNavigationUrl
   | InitControllerStateAction
@@ -887,3 +898,6 @@ export type Action =
   | SetLogLevelTypeAction
   | SetCrashAnalyticsAction
   | DismissBanner
+  | SetPrivacyModeAction
+  | GetPrivacyStatusAction
+  | GetTorConnectionStatusAction
