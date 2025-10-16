@@ -7,6 +7,8 @@
   </p>
 </div>
 
+> Demo Video https://youtu.be/Jv7WTnsUNEY
+
 ## Research Project Overview
 
 **Research Question:** How do Tor and Nym mixnets compare for protecting Ethereum RPC metadata, and what are the practical tradeoffs?
