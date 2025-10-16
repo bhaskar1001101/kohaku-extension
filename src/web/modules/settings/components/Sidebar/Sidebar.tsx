@@ -72,6 +72,12 @@ export const SETTINGS_LINKS = [
     path: ROUTES.recoveryPhrasesSettings
   },
   {
+    key: 'privacy',
+    Icon: SettingsIcon,
+    label: 'Privacy Mode',
+    path: ROUTES.privacySettings
+  },
+  {
     key: 'device-password-change',
     Icon: React.memo(KeyStoreSettingsIcon),
     label: 'Extension password',

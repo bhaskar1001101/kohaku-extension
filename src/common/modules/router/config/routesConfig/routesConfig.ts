@@ -318,6 +318,13 @@ const routesConfig: RouteConfig = {
     }),
     name: Platform.select({ default: i18n.t('Security and Privacy') })
   },
+  [ROUTES.privacySettings]: {
+    route: ROUTES.privacySettings,
+    title: Platform.select({
+      default: i18n.t('Privacy Mode')
+    }),
+    name: Platform.select({ default: i18n.t('Privacy Mode') })
+  },
   [ROUTES.accountsSettings]: {
     route: ROUTES.accountsSettings,
     title: Platform.select({

@@ -22,6 +22,7 @@ import useMainControllerState from '@web/hooks/useMainControllerState'
 import useSelectedAccountControllerState from '@web/hooks/useSelectedAccountControllerState'
 
 import GasTankButton from '../DashboardHeader/GasTankButton'
+import TorStatusBadge from '../TorStatusBadge/TorStatusBadge'
 import BalanceAffectingErrors from './BalanceAffectingErrors'
 import RefreshIcon from './RefreshIcon'
 import getStyles from './styles'
@@ -257,6 +258,7 @@ const DashboardOverview: FC<Props> = ({
                     isLoadingTakingTooLong={isLoadingTakingTooLong}
                   />
                 </View>
+                <TorStatusBadge />
               </View>
               <Routes openReceiveModal={openReceiveModal} />
             </Animated.View>
