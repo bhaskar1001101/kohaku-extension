@@ -1,0 +1,18 @@
+# Working Nym Exit Gateway Provider Addresses (Mainnet)
+# Format: nym-socks5-client init --id kohaku --provider <ADDRESS>
+
+# Oceanus Staking UAE 2 (High performance, 0.92 score)
+AnSgua8vSzD5Tw6XB5AocTgAS4NCNA4pSuXNsWVjPBEw.CoPyxt8nbgEmWibEtysMkqQkaWJuXUk5DiEyxpkqVHoW@5XjrYTRu5j5npwtMenq5vanVtDBREu3iX5yymS8qxnu9
+
+# gateway13 (TupiNymQuim, Austria, 0.95 score)
+9LWDWqYzCh6TtVMARTetMCyTQHb3CxLDAUY4bwDfiFLR.As7oBCrYyboghoJPQkxTY7U9k1sAYzJCuUBG1kQWxSUU@AMnDNd1Xgw7Em9R5vehP7r12ZNWUZ3jmitDHya6gpvGR
+
+# Hermes Stakepool Austria (0.92 score)
+DciB1DWHX3SKxqP8bzBPRLDyWMvrKde2opo1rgJbSuEb.9QtaToVdc5w9GwX1o4f1JCUXmHFkVXLLhmn2wdKCmrjE@98FmUvDdQYEeV1ioi5NpFK7DoeHphVECndaG7fkRUsaF
+
+# nymtech official (mainnet-gateway3, 0.97 score - Vienna)
+EHd4ateeBymST92RBwtDzZRCzUt4wtiyP2zHMmUbSXgA.EzYvbcTnW834VuzsfED1d19GuARLkPKdXMRq8dC3UjBn@2xU4CBE6QiiYt6EyBXSALwxkNvM7gqJfjHXaMkjiFmYW
+
+# Test with one of these:
+# sudo ~/.local/bin/nym-socks5-client init --id kohaku --provider <ADDRESS>
+# sudo ~/.local/bin/nym-socks5-client run --id kohaku

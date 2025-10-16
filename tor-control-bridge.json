@@ -1,0 +1,9 @@
+{
+  "name": "com.ambire.tor_control",
+  "description": "Tor Control Port Bridge for Ambire Wallet",
+  "path": "/home/bhaskar/dev/kohaku-extension/tor-control-bridge.py",
+  "type": "stdio",
+  "allowed_extensions": [
+    "wallet@ambire.com"
+  ]
+}
